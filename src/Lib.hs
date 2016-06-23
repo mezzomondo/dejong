@@ -17,7 +17,7 @@ startPopulation n seed = take n (randomRs (-100.0, 100.0) seed :: [Gene])
 startPopulationIO :: Int -> IO [Gene]
 startPopulationIO n = do
     seed <- newStdGen
-    return $ take n (randomRs (-100.0, 100.0) seed :: [Gene])
+    return $ startPopulation n seed
 
 calcFitness :: [Gene] -> [Float]
 calcFitness xs = map fitnessFunction xs
@@ -28,16 +28,25 @@ mutateIO g = do
 -- making an identical copy of the parent, and then probabilistically mutating it to produce the offspring.
     return (g + (factor * 0.1))
 
+idIO :: Gene -> IO Gene
+idIO g = do
+    return g
+
+extractRandomElementIO :: [Gene] -> Int -> (Gene -> IO Gene) -> IO Gene
+extractRandomElementIO pop pos f = do
+    let elem = (pop !! pos)
+    offspring <- f elem
+    return offspring
+
 evolveIO :: [Gene] -> IO [Gene]
 evolveIO pop = do
     pos <- randomRIO (0, length pop - 1)
 -- select a parent randomly using a uniform probability distribution over the current population.
-    let elem = (pop !! pos)
 -- Use the selected parent to produce a single offspring
-    offspring <- mutateIO elem
+    offspring <- extractRandomElementIO pop pos mutateIO
+-- randomly selecting a candidate for deletion from the current population using a uniform probability distribution; and keeping either the candidate or the offspring depending on wich one has higher fitness.
     pos2 <- randomRIO (0, length pop - 1)
-    let opponent = (pop !! pos2)
--- randomply selecting a candidate for deletion from the current population using a uniform probability distribution; and keeping either the candidate or the offspring depending on wich one has higher fitness.
+    opponent <- extractRandomElementIO pop pos2 idIO
     let winner = if (fitnessFunction opponent) >= (fitnessFunction offspring) then opponent else offspring
     return (replaceAtIndex pos2 winner pop)
 
@@ -72,10 +81,10 @@ one_one = do
     putStrLn "Using delta mutation with step size 0.1"
     putStrLn ("Population size: " ++ show popsize)
     putStrLn "First generation (with fitness):"
-    print (zip pop (map fitnessFunction pop))
+    print (zip pop (calcFitness pop))
     let sec = newpop !! 990
     putStrLn "Second generation (with fitness):"
-    print (zip sec (map fitnessFunction sec))
+    print (zip sec (calcFitness sec))
     let sixty = newpop !! 950
     putStrLn "Sixth generation (with fitness):"
     print (zip sixty (map fitnessFunction sixty))
