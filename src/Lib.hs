@@ -85,9 +85,9 @@ one_one = do
     let sec = newpop !! 990
     putStrLn "Second generation (with fitness):"
     print (zip sec (calcFitness sec))
-    let sixty = newpop !! 950
+    let sixth = newpop !! 950
     putStrLn "Sixth generation (with fitness):"
-    print (zip sixty (map fitnessFunction sixty))
+    print (zip sixth (map fitnessFunction sixth))
     let last = head newpop
     putStrLn "Last generation (with fitness):"
     print (zip last (map fitnessFunction last))
