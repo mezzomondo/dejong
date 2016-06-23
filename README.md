@@ -22,4 +22,4 @@ EV:
  End Do
 ```
 
-I choose this example in order to learn some "real world" Haskell (and I found it veri challenging), comments and suggestions are welcome.
+I choose this example in order to learn some "real world" Haskell (and I found it very challenging), comments and suggestions are welcome.
