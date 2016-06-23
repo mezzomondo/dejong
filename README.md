@@ -26,3 +26,10 @@ EV:
 ```
 
 I choose this example in order to learn some "real world" Haskell (and I found it very challenging), comments and suggestions are welcome.
+
+## Instructions
+
+```
+$ stack build
+$ stack exec dejong-exe
+```
