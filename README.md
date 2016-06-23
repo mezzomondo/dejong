@@ -4,7 +4,8 @@ Here's the algorithm as stated in the book (p. 4):
 
 ```
 EV:
- Randomly generate the initial population of M individuals (using a uniform probability distribution over the entire geno/phenospace) and compute the fitness of each individual.
+ Randomly generate the initial population of M individuals (using a uniform probability distribution over
+ the entire geno/phenospace) and compute the fitness of each individual.
  Do Forever:
    Choose a parent as follows:
 
@@ -18,7 +19,9 @@ EV:
 
    Select a member of the population to die by:
 
-     - randomly selecting a candidate for deletion from the current population using a uniform probability distribution; and keeping either the candidate or the offspring depending on wich one has higher fitness.
+     - randomly selecting a candidate for deletion from the current population using a uniform probability
+       distribution; and keeping either the candidate or the offspring depending on wich one has
+       higher fitness.
  End Do
 ```
 
