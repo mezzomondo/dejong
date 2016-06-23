@@ -25,15 +25,19 @@ calcFitness xs = map fitnessFunction xs
 mutateIO :: Gene -> IO Gene
 mutateIO g = do
     factor <- pick [-1.0, 1.0]
+-- making an identical copy of the parent, and then probabilistically mutating it to produce the offspring.
     return (g + (factor * 0.1))
 
 evolveIO :: [Gene] -> IO [Gene]
 evolveIO pop = do
     pos <- randomRIO (0, length pop - 1)
+-- select a parent randomly using a uniform probability distribution over the current population.
     let elem = (pop !! pos)
+-- Use the selected parent to produce a single offspring
     offspring <- mutateIO elem
     pos2 <- randomRIO (0, length pop - 1)
     let opponent = (pop !! pos2)
+-- randomply selecting a candidate for deletion from the current population using a uniform probability distribution; and keeping either the candidate or the offspring depending on wich one has higher fitness.
     let winner = if (fitnessFunction opponent) >= (fitnessFunction offspring) then opponent else offspring
     return (replaceAtIndex pos2 winner pop)
 
@@ -59,6 +63,7 @@ one_one :: IO ()
 one_one = do
     let limit = 1000
     let popsize = 10
+-- Randomly generate the initial population of M individuals (using a uniform probability distribution over the entire geno/phenospace) and compute the fitness of each individual.    
     pop <- startPopulationIO popsize 
     newpop <- generateIO pop [] limit 
     putStrLn ("Simulation limit (#births): " ++ show limit)
