@@ -1,9 +1,10 @@
 module Lib
-    ( one_one 
+    ( one_one
     ) where
 
 import System.Random
 import Data.List
+import Text.Printf
 
 type Gene = Float
 type History = [[Gene]]
@@ -68,6 +69,9 @@ pick xs = do
 replaceAtIndex :: Int -> a -> [a] -> [a]
 replaceAtIndex n item ls = a ++ (item:b) where (a, (_:b)) = splitAt n ls
 
+format :: (Text.Printf.PrintfArg a, Text.Printf.PrintfArg b) => (a, b) -> IO ()
+format x = putStrLn ("Gene: " ++ (printf "%12.8f" (fst x) ++ " " ++ "; Fitness: " ++ (printf "%14.8f" (snd x))))
+
 one_one :: IO ()
 one_one = do
     let limit = 1000
@@ -80,14 +84,14 @@ one_one = do
     putStrLn "Bounds: [-100.0, 100.0]"
     putStrLn "Using delta mutation with step size 0.1"
     putStrLn ("Population size: " ++ show popsize)
-    putStrLn "First generation (with fitness):"
-    print (zip pop (calcFitness pop))
+    putStrLn "First generation:"
+    mapM_ format (zip pop (calcFitness pop))
     let sec = newpop !! 990
-    putStrLn "Second generation (with fitness):"
-    print (zip sec (calcFitness sec))
+    putStrLn "Second generation:"
+    mapM_ format (zip sec (calcFitness sec))
     let sixth = newpop !! 950
-    putStrLn "Sixth generation (with fitness):"
-    print (zip sixth (map fitnessFunction sixth))
+    putStrLn "Sixth generation:"
+    mapM_ format (zip sixth (map fitnessFunction sixth))
     let last = head newpop
-    putStrLn "Last generation (with fitness):"
-    print (zip last (map fitnessFunction last))
+    putStrLn "Last generation:"
+    mapM_ format (zip last (map fitnessFunction last))
