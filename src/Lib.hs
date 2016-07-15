@@ -1,5 +1,5 @@
 module Lib
-    ( one_one
+    ( examples
     ) where
 
 import System.Random
@@ -72,8 +72,8 @@ replaceAtIndex n item ls = a ++ (item:b) where (a, (_:b)) = splitAt n ls
 format :: (Text.Printf.PrintfArg a, Text.Printf.PrintfArg b) => (a, b) -> IO ()
 format x = putStrLn ("Gene: " ++ (printf "%12.8f" (fst x) ++ " " ++ "; Fitness: " ++ (printf "%14.8f" (snd x))))
 
-one_one :: IO ()
-one_one = do
+example1_1 :: IO ()
+example1_1 = do
     let limit = 1000
     let popsize = 10
 -- Randomly generate the initial population of M individuals (using a uniform probability distribution over the entire geno/phenospace) and compute the fitness of each individual.    
@@ -95,3 +95,19 @@ one_one = do
     let last = head newpop
     putStrLn "Last generation:"
     mapM_ format (zip last (map fitnessFunction last))
+
+example1_2 :: IO ()
+example1_2 = putStrLn "Giao"
+
+examples :: IO ()
+examples = do
+    putStrLn "Examples available:"
+    putStrLn "1) Chapter one example one."
+    putStrLn "2) Chapter one example two."
+    putStrLn "Make your choice (q to quit):"
+    c <- getLine
+    if c == "1"
+        then example1_1
+        else if c == "2"
+            then example1_2
+            else putStrLn "Goodbye!"
