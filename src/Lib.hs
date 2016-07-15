@@ -95,9 +95,12 @@ example1_1 = do
     let last = head newpop
     putStrLn "Last generation:"
     mapM_ format (zip last (map fitnessFunction last))
+    examples
 
 example1_2 :: IO ()
-example1_2 = putStrLn "Giao"
+example1_2 = do
+    putStrLn "Giao"
+    examples
 
 examples :: IO ()
 examples = do
