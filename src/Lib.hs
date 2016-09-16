@@ -2,19 +2,22 @@ module Lib
     ( examples
     ) where
 
-import BaseGene
+import Common
 
 import Text.Printf
 
-format :: (Text.Printf.PrintfArg a, Text.Printf.PrintfArg b) => (a, b) -> IO ()
-format x = putStrLn ("Gene: " ++ (printf "%12.8f" (fst x) ++ " " ++ "; Fitness: " ++ (printf "%14.8f" (snd x))))
+format :: (BaseGene, Float) -> IO ()
+format x = do
+    let g = getBaseGene $ fst x
+    let f = snd x
+    putStrLn ("Gene: " ++ (printf "%12.8f" g ++ " " ++ "; Fitness: " ++ (printf "%14.8f" f)))
 
 example1 :: (BaseGene -> IO BaseGene) -> String -> IO ()
 example1 f s = do
     let limit = 1000
     let popsize = 10
 -- Randomly generate the initial population of M individuals (using a uniform probability distribution over the entire geno/phenospace) and compute the fitness of each individual.    
-    pop <- baseStartPopulationIO popsize 
+    pop <- startPopulationIO popsize 
     newpop <- generateIO pop f [] limit 
     putStrLn ("Simulation limit (#births): " ++ show limit)
     putStrLn "Fintness function: y = 50 - (x^2)"
@@ -22,23 +25,23 @@ example1 f s = do
     putStrLn s
     putStrLn ("Population size: " ++ show popsize)
     putStrLn "First generation:"
-    mapM_ format (zip pop (baseCalcFitness pop))
+    mapM_ format (zip pop (calcFitness pop))
     let sec = newpop !! 990
     putStrLn "Second generation:"
-    mapM_ format (zip sec (baseCalcFitness sec))
+    mapM_ format (zip sec (calcFitness sec))
     let sixth = newpop !! 950
     putStrLn "Sixth generation:"
-    mapM_ format (zip sixth (map baseFitnessFunction sixth))
+    mapM_ format (zip sixth (map fitnessFunction sixth))
     let last = head newpop
     putStrLn "Last generation:"
-    mapM_ format (zip last (map baseFitnessFunction last))
+    mapM_ format (zip last (map fitnessFunction last))
     examples
 
 example1_1 :: IO()
 example1_1 = example1 mutateStandardIO "Using delta mutation with step size 1.0"
 
 example1_2 :: IO ()
-example1_2 = example1 baseMutateGaussIO "Using gaussian mutation with step size 1.0"
+example1_2 = example1 mutateGaussIO "Using gaussian mutation with step size 1.0"
 
 examples :: IO ()
 examples = do
