@@ -1,4 +1,4 @@
-## First two examples of first chapter of 'Evolutionary Computation a unified approach' by Kenneth A. De Jong written in Haskell
+## First three examples of first chapter of 'Evolutionary Computation a unified approach' by Kenneth A. De Jong written in Haskell
 
 Here's the algorithm as stated in the book (p. 4):
 

@@ -4,9 +4,10 @@ module Common
     , replaceAtIndex
     , pick
     , boxMuller
-    , fitnessFunction
+    , FitnessFunction(..)
+    , GeneFormat(..)
     , idIO
-    , startPopulationIO
+    , StartPopulationIO(..)
     , calcFitness
     , mutateStandardIO
     , mutateGaussIO
@@ -16,6 +17,7 @@ module Common
 -- the (..) also exports the constructor
 
 import System.Random
+import Text.Printf
 
 --
 -- Our genes
@@ -43,7 +45,7 @@ boxMuller gen = (sqrt (-2 * log u1) * cos (2 * pi * u2), gen'')
           (u2, gen'') = randomR (0, 1) gen'
 
 --
--- Fitness functions
+-- Fitness functions (type class)
 -- In the end from Haskell point of view a gene is something
 -- that has a fitness function
 --
@@ -56,6 +58,24 @@ instance FitnessFunction BaseGene where
 instance FitnessFunction CoupleGene where
     fitnessFunction = \(CoupleGene (x, y)) -> x^2 + y^2
 
+-- 
+-- Print formatting functions (type class)
+--
+class GeneFormat g where
+    geneFormat :: (g, Float) -> IO ()
+
+instance GeneFormat BaseGene where
+    geneFormat x = do
+        let g = getBaseGene $ fst x
+        let f = snd x
+        putStrLn ("Gene: " ++ (printf "%12.8f" g ++ " " ++ "; Fitness: " ++ (printf "%14.8f" f)))
+
+instance GeneFormat CoupleGene where
+    geneFormat x = do
+        let (g1, g2) = getCoupleGene $ fst x
+        let f = snd x
+        putStrLn ("Gene: (" ++ (printf "%12.8f" g1) ++ ", " ++ (printf "%12.8f" g2) ++"); Fitness: " ++ (printf "%14.8f" f))
+
 --
 -- Generic id function
 --
@@ -67,17 +87,17 @@ idIO g = do
 -- Type class with instances that generate the starting population
 -- 
 class StartPopulationIO g where
-    startPopulationIO :: Int -> IO [g]
+    startPopulationIO :: Int -> Float -> Float -> IO [g]
 
 instance StartPopulationIO BaseGene where
-    startPopulationIO n = do
+    startPopulationIO n lb ub = do
         seed <- newStdGen
-        return $ take n (map BaseGene (randomRs (-100.0, 100.0) seed))
+        return $ take n (map BaseGene (randomRs (lb, ub) seed))
 
 instance StartPopulationIO CoupleGene where
-    startPopulationIO n = do
+    startPopulationIO n lb ub= do
         seed <- newStdGen
-        return $ take n (map CoupleGene (zip (randomRs (-5.0, 5.0) seed) (randomRs (-5.0, 5.0) seed)))
+        return $ take n (map CoupleGene (zip (randomRs (lb, ub) seed) (randomRs (-5.0, 5.0) seed)))
 
 --
 -- Generic function to calculate the fitness
@@ -131,8 +151,8 @@ extractElementAndMutateIO pop pos f = do
 -- Generic function that takes a population and a mutation function
 -- and returns a new population with the mutation in place if it has higher fitness
 --
-evolveIO :: FitnessFunction g => [g] -> (g -> IO g) -> IO [g]
-evolveIO pop f = do
+evolveIO :: FitnessFunction g => [g] -> (g -> IO g) -> Float -> Float -> IO [g]
+evolveIO pop f lb ub = do
     pos <- randomRIO (0, length pop - 1)
 -- select a parent randomly using a uniform probability distribution over the current population.
 -- Use the selected parent to produce a single offspring
@@ -140,7 +160,13 @@ evolveIO pop f = do
 -- randomly selecting a candidate for deletion from the current population using a uniform probability distribution; and keeping either the candidate or the offspring depending on wich one has higher fitness.
     pos2 <- randomRIO (0, length pop - 1)
     opponent <- extractElementAndMutateIO pop pos2 idIO
-    let winner = if (fitnessFunction opponent) >= (fitnessFunction offspring) then opponent else offspring
+    let offFitness = fitnessFunction offspring
+    let winner = if lb <= offFitness && offFitness <= ub
+            then if offFitness >= (fitnessFunction opponent)
+                then offspring
+                else opponent
+            else opponent
+    --let winner = if (fitnessFunction opponent) >= (fitnessFunction offspring) then opponent else offspring
     return (replaceAtIndex pos2 winner pop)
 
 --
@@ -152,12 +178,12 @@ evolveIO pop f = do
 -- n number of steps remaining
 -- IO [[g]] full history
 --
-generateIO :: FitnessFunction g => [g] -> (g -> IO g) -> [[g]] -> Int -> IO [[g]]
-generateIO xs f acc n =
+generateIO :: FitnessFunction g => [g] -> (g -> IO g) -> [[g]] -> Int -> Float -> Float -> IO [[g]]
+generateIO xs f acc n lb ub =
     if n == 0
-    then do
-        ys <- evolveIO xs f
-        return ([ys]++[xs]++acc)  
-    else do
-        ys <- evolveIO xs f
-        generateIO ys f ([xs]++acc) (n-1)
+        then do
+            ys <- evolveIO xs f lb ub
+            return ([ys]++[xs]++acc)  
+        else do
+            ys <- evolveIO xs f lb ub
+            generateIO ys f ([xs]++acc) (n-1) lb ub
