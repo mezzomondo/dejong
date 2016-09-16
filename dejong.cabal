@@ -16,7 +16,9 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Lib
-  other-modules:       BaseGene 
+  other-modules:       Common
+                     , BaseGene
+                     , CoupleGene
   build-depends:       base >= 4.7 && < 5
                      , random
                      , mtl
