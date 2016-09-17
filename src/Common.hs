@@ -95,9 +95,10 @@ instance StartPopulationIO BaseGene where
         return $ take n (map BaseGene (randomRs (lb, ub) seed))
 
 instance StartPopulationIO CoupleGene where
-    startPopulationIO n lb ub= do
-        seed <- newStdGen
-        return $ take n (map CoupleGene (zip (randomRs (lb, ub) seed) (randomRs (-5.0, 5.0) seed)))
+    startPopulationIO n lb ub = do
+        seed_1 <- newStdGen
+        seed_2 <- newStdGen
+        return $ take n (map CoupleGene (zip (randomRs (lb, ub) seed_1) (randomRs (lb, ub) seed_2)))
 
 --
 -- Generic function to calculate the fitness
@@ -107,13 +108,22 @@ calcFitness :: FitnessFunction g => [g] -> [Float]
 calcFitness xs = map fitnessFunction xs
 
 --
--- Mutation using delta mutation (no good), only available for BaseGene
+-- Mutation using delta mutation
 --
-mutateStandardIO :: BaseGene -> IO BaseGene
-mutateStandardIO g = do
-    factor <- pick [-1.0, 1.0]
+class MutateStandardIO g where
+    mutateStandardIO :: g -> IO g
+
+instance MutateStandardIO BaseGene where
+    mutateStandardIO (BaseGene g) = do
+        factor <- pick [-1.0, 1.0]
 -- making an identical copy of the parent, and then probabilistically mutating it to produce the offspring.
-    return $ BaseGene ((getBaseGene g) + factor)
+        return $ BaseGene (g + factor)
+
+instance MutateStandardIO CoupleGene where
+    mutateStandardIO (CoupleGene (f, s)) = do
+        factor <- pick [-1.0, 1.0]
+-- making an identical copy of the parent, and then probabilistically mutating it to produce the offspring.
+        return $ CoupleGene (f + factor, s + factor)
 
 --
 -- Type class with instances that probabilistically mutate a gene
@@ -123,19 +133,19 @@ class MutateGaussIO g where
     mutateGaussIO :: g -> IO g
 
 instance MutateGaussIO BaseGene where
-    mutateGaussIO g = do
+    mutateGaussIO (BaseGene g) = do
         gen <- newStdGen
         let factor = fst $ boxMuller gen
 -- making an identical copy of the parent, and then probabilistically mutating it to produce the offspring.
-        return $ BaseGene ((getBaseGene g) + factor)
+        return $ BaseGene (g + factor)
 
 instance MutateGaussIO CoupleGene where
     mutateGaussIO (CoupleGene (f, s)) = do
         gen <- newStdGen
-        let (delta1, newgen) = boxMuller gen
-        let delta2 = fst $ boxMuller newgen -- Ignore the new StdGen
+        let (delta_1, newgen) = boxMuller gen
+        let delta_2 = fst $ boxMuller newgen -- Ignore the new StdGen
 -- making an identical copy of the parent, and then probabilistically mutating it to produce the offspring.
-        return $ CoupleGene (f + delta1, s + delta2)
+        return $ CoupleGene (f + delta_1, s + delta_1)
 
 --
 -- Generic function to extract a gene and mutate it using 
@@ -153,21 +163,23 @@ extractElementAndMutateIO pop pos f = do
 --
 evolveIO :: FitnessFunction g => [g] -> (g -> IO g) -> Float -> Float -> IO [g]
 evolveIO pop f lb ub = do
-    pos <- randomRIO (0, length pop - 1)
+    pos_1 <- randomRIO (0, length pop - 1)
+    pos_2 <- randomRIO (0, length pop - 1)
 -- select a parent randomly using a uniform probability distribution over the current population.
 -- Use the selected parent to produce a single offspring
-    offspring <- extractElementAndMutateIO pop pos f
--- randomly selecting a candidate for deletion from the current population using a uniform probability distribution; and keeping either the candidate or the offspring depending on wich one has higher fitness.
-    pos2 <- randomRIO (0, length pop - 1)
-    opponent <- extractElementAndMutateIO pop pos2 idIO
+    offspring <- extractElementAndMutateIO pop pos_1 f
+-- randomly selecting a candidate for deletion from the current population using a uniform probability distribution;
+-- and keeping either the candidate or the offspring depending on wich one has higher fitness.
+    opponent <- extractElementAndMutateIO pop pos_2 idIO
     let offFitness = fitnessFunction offspring
+    let oppFitness = fitnessFunction opponent
     let winner = if lb <= offFitness && offFitness <= ub
-            then if offFitness >= (fitnessFunction opponent)
+            then if offFitness > oppFitness
                 then offspring
                 else opponent
             else opponent
     --let winner = if (fitnessFunction opponent) >= (fitnessFunction offspring) then opponent else offspring
-    return (replaceAtIndex pos2 winner pop)
+    return (replaceAtIndex pos_2 winner pop)
 
 --
 -- Core generic function that generates n generations starting fom
