@@ -4,6 +4,7 @@ module Common
     , replaceAtIndex
     , pick
     , boxMuller
+    , InBounds
     , FitnessFunction(..)
     , GeneFormat(..)
     , idIO
@@ -43,6 +44,21 @@ boxMuller :: StdGen -> (Float, StdGen)
 boxMuller gen = (sqrt (-2 * log u1) * cos (2 * pi * u2), gen'')
     where (u1, gen')  = randomR (0, 1) gen 
           (u2, gen'') = randomR (0, 1) gen'
+
+--
+-- Check if in bounds
+--
+class InBounds g where
+    inBounds :: g -> Float -> Float -> Bool
+
+--instance InBounds Float where
+--    inBounds f lb ub = (lb <= f) && (f <= ub)
+
+instance InBounds BaseGene where
+    inBounds (BaseGene g) lb ub = (lb <= g) && (g <= ub) 
+
+instance InBounds CoupleGene where
+    inBounds (CoupleGene (x, y)) lb ub = (lb <= x) && (x <= ub) && (lb <= y) && (y <= ub)
 
 --
 -- Fitness functions (type class)
@@ -137,7 +153,8 @@ instance MutateGaussIO BaseGene where
         gen <- newStdGen
         let factor = fst $ boxMuller gen
 -- making an identical copy of the parent, and then probabilistically mutating it to produce the offspring.
-        return $ BaseGene (g + factor)
+-- (1.3 is copied from the original Java code)
+        return $ BaseGene (g + factor * 1.3)
 
 instance MutateGaussIO CoupleGene where
     mutateGaussIO (CoupleGene (f, s)) = do
@@ -145,7 +162,8 @@ instance MutateGaussIO CoupleGene where
         let (delta_1, newgen) = boxMuller gen
         let delta_2 = fst $ boxMuller newgen -- Ignore the new StdGen
 -- making an identical copy of the parent, and then probabilistically mutating it to produce the offspring.
-        return $ CoupleGene (f + delta_1, s + delta_1)
+-- (1.3 is copied from the original Java code)
+        return $ CoupleGene (f + delta_1 * 1.3, s + delta_2 * 1.3)
 
 --
 -- Generic function to extract a gene and mutate it using 
@@ -161,26 +179,23 @@ extractElementAndMutateIO pop pos f = do
 -- Generic function that takes a population and a mutation function
 -- and returns a new population with the mutation in place if it has higher fitness
 --
-evolveIO :: FitnessFunction g => [g] -> (g -> IO g) -> Float -> Float -> IO [g]
+evolveIO :: (InBounds g, FitnessFunction g) => [g] -> (g -> IO g) -> Float -> Float -> IO [g]
 evolveIO pop f lb ub = do
     pos_1 <- randomRIO (0, length pop - 1)
     pos_2 <- randomRIO (0, length pop - 1)
 -- select a parent randomly using a uniform probability distribution over the current population.
 -- Use the selected parent to produce a single offspring
     offspring <- extractElementAndMutateIO pop pos_1 f
--- randomly selecting a candidate for deletion from the current population using a uniform probability distribution;
--- and keeping either the candidate or the offspring depending on wich one has higher fitness.
     opponent <- extractElementAndMutateIO pop pos_2 idIO
     let offFitness = fitnessFunction offspring
     let oppFitness = fitnessFunction opponent
-    let winner = if lb <= offFitness && offFitness <= ub
-            then if offFitness > oppFitness
-                then offspring
-                else opponent
-            else opponent
-    --let winner = if (fitnessFunction opponent) >= (fitnessFunction offspring) then opponent else offspring
-    return (replaceAtIndex pos_2 winner pop)
-
+    let winner = if offFitness > oppFitness then offspring else opponent
+    if inBounds offspring lb ub
+-- randomly selecting a candidate for deletion from the current population using a uniform probability distribution;
+-- and keeping either the candidate or the offspring depending on wich one has higher fitness.
+        then return (replaceAtIndex pos_2 winner pop)
+        else return pop 
+ 
 --
 -- Core generic function that generates n generations starting fom
 -- the initial population using a probabilistic mutation function
@@ -190,7 +205,7 @@ evolveIO pop f lb ub = do
 -- n number of steps remaining
 -- IO [[g]] full history
 --
-generateIO :: FitnessFunction g => [g] -> (g -> IO g) -> [[g]] -> Int -> Float -> Float -> IO [[g]]
+generateIO :: (InBounds g, FitnessFunction g) => [g] -> (g -> IO g) -> [[g]] -> Int -> Float -> Float -> IO [[g]]
 generateIO xs f acc n lb ub =
     if n == 0
         then do

@@ -4,7 +4,7 @@ module Lib
 
 import Common
 
-example1 :: (StartPopulationIO g, FitnessFunction g, GeneFormat g) => (g -> IO g) -> Float -> Float -> String -> IO ()
+example1 :: (InBounds g, StartPopulationIO g, FitnessFunction g, GeneFormat g) => (g -> IO g) -> Float -> Float -> String -> IO ()
 example1 f lb ub s = do
     let limit = 1000
     let popsize = 10
