@@ -4,15 +4,15 @@ module Lib
 
 import Common
 
-example1 :: (InBounds g, StartPopulationIO g, FitnessFunction g, GeneFormat g) => (g -> IO g) -> Float -> Float -> String -> IO ()
-example1 f lb ub s = do
+example1 :: (InBounds g, StartPopulationIO g, FitnessFunction g, GeneFormat g) => (g -> IO g) -> Float -> Float -> String -> String -> IO ()
+example1 f lb ub s ff = do
     let limit = 1000
     let popsize = 10
 -- Randomly generate the initial population of M individuals (using a uniform probability distribution over the entire geno/phenospace) and compute the fitness of each individual.    
     pop <- startPopulationIO popsize lb ub
     newpop <- generateIO pop f [] limit lb ub
     putStrLn ("Simulation limit (#births): " ++ show limit)
-    putStrLn "Fintness function: y = 50 - (x^2)"
+    putStrLn ("Fintness function: " ++ show ff)
     putStrLn ("Bounds: [" ++ show lb ++ ", " ++ show ub ++ "]")
     putStrLn s
     putStrLn ("Population size: " ++ show popsize)
@@ -47,12 +47,10 @@ parseInput c
     | otherwise = putStrLn "Goodbye!"
 
 example1_1 :: IO()
-example1_1 = example1 (mutateStandardIO :: BaseGene -> IO BaseGene) (-100.0) 100.0 "BaseGene - Using delta mutation with step size 1.0"
+example1_1 = example1 (mutateStandardIO :: BaseGene -> IO BaseGene) (-100.0) 100.0 "BaseGene - Using delta mutation with step size 1.0" "50 - (x^2)"
 
 example1_2 :: IO ()
-example1_2 = example1 (mutateGaussIO :: BaseGene -> IO BaseGene) (-100.0) 100.0 "BaseGene - Using gaussian mutation with step size 1.0"
+example1_2 = example1 (mutateGaussIO :: BaseGene -> IO BaseGene) (-100.0) 100.0 "BaseGene - Using gaussian mutation with step size 1.0" "50 - (x^2)"
 
 example1_3 :: IO ()
-example1_3 = example1 (mutateGaussIO :: CoupleGene -> IO CoupleGene) (-5.0) 5.0 "CoupleGene - Using gaussian mutation with step size 1.0"
---example1_3 :: IO ()
---example1_3 = example1 (mutateStandardIO :: CoupleGene -> IO CoupleGene) (-5.0) 5.0 "CoupleGene - Using gaussian mutation with step size 1.0"
+example1_3 = example1 (mutateGaussIO :: CoupleGene -> IO CoupleGene) (-5.0) 5.0 "CoupleGene - Using gaussian mutation with step size 1.0" "x^2 + y^2"

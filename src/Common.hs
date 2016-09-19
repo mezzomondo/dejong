@@ -153,8 +153,7 @@ instance MutateGaussIO BaseGene where
         gen <- newStdGen
         let factor = fst $ boxMuller gen
 -- making an identical copy of the parent, and then probabilistically mutating it to produce the offspring.
--- (1.3 is copied from the original Java code)
-        return $ BaseGene (g + factor * 1.3)
+        return $ BaseGene (g + factor)
 
 instance MutateGaussIO CoupleGene where
     mutateGaussIO (CoupleGene (f, s)) = do
@@ -162,8 +161,7 @@ instance MutateGaussIO CoupleGene where
         let (delta_1, newgen) = boxMuller gen
         let delta_2 = fst $ boxMuller newgen -- Ignore the new StdGen
 -- making an identical copy of the parent, and then probabilistically mutating it to produce the offspring.
--- (1.3 is copied from the original Java code)
-        return $ CoupleGene (f + delta_1 * 1.3, s + delta_2 * 1.3)
+        return $ CoupleGene (f + delta_1, s + delta_2)
 
 --
 -- Generic function to extract a gene and mutate it using 
