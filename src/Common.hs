@@ -59,9 +59,6 @@ generateGaussIO = do
 class InBounds g where
     inBounds :: g -> Float -> Float -> Bool
 
---instance InBounds Float where
---    inBounds f lb ub = (lb <= f) && (f <= ub)
-
 instance InBounds BaseGene where
     inBounds (BaseGene g) lb ub = (lb <= g) && (g <= ub) 
 
