@@ -46,6 +46,14 @@ boxMuller gen = (sqrt (-2 * log u1) * cos (2 * pi * u2), gen'')
           (u2, gen'') = randomR (0, 1) gen'
 
 --
+-- Helper function that wraps boxMuller
+--
+generateGaussIO :: IO Float
+generateGaussIO = do
+    gen <- newStdGen
+    return (fst $ boxMuller gen)
+
+--
 -- Check if in bounds
 --
 class InBounds g where
@@ -150,16 +158,14 @@ class MutateGaussIO g where
 
 instance MutateGaussIO BaseGene where
     mutateGaussIO (BaseGene g) = do
-        gen <- newStdGen
-        let factor = fst $ boxMuller gen
+        factor <- generateGaussIO
 -- making an identical copy of the parent, and then probabilistically mutating it to produce the offspring.
         return $ BaseGene (g + factor)
 
 instance MutateGaussIO CoupleGene where
     mutateGaussIO (CoupleGene (f, s)) = do
-        gen <- newStdGen
-        let (delta_1, newgen) = boxMuller gen
-        let delta_2 = fst $ boxMuller newgen -- Ignore the new StdGen
+        delta_1 <- generateGaussIO
+        delta_2 <- generateGaussIO
 -- making an identical copy of the parent, and then probabilistically mutating it to produce the offspring.
         return $ CoupleGene (f + delta_1, s + delta_2)
 
