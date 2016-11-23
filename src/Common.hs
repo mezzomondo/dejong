@@ -2,22 +2,21 @@ module Common
     ( BaseGene(..)
     , CoupleGene(..)
     , replaceAtIndex
-    , pick
     , boxMuller
     , InBounds
     , FitnessFunction(..)
     , GeneFormat(..)
-    , idIO
-    , StartPopulationIO(..)
+    , StartPopulation(..)
     , calcFitness
-    , mutateStandardIO
-    , mutateGaussIO
-    , evolveIO
-    , generateIO
+    , mutateStandard
+    , mutateGauss
+    , evolve
+    , generate
     ) where
 -- the (..) also exports the constructor
 
 import System.Random
+import Control.Monad.State.Lazy
 import Text.Printf
 
 --
@@ -32,26 +31,25 @@ newtype CoupleGene = CoupleGene { getCoupleGene :: (Float, Float) } deriving Sho
 replaceAtIndex :: Int -> a -> [a] -> [a]
 replaceAtIndex n item ls = a ++ (item:b) where (a, (_:b)) = splitAt n ls
 
-pick :: [a] -> IO a
-pick xs = do
-    pos <- randomRIO (0, length xs - 1)
-    return (xs !! pos)
+pick :: [a] -> StdGen -> (a, StdGen)
+pick xs seed = extractInCouple xs (getPosition xs seed)
+    
+-- Helpers for the pick function 
+bounds :: [a] -> (Int, Int)
+bounds xs = (0, length xs - 1)
 
+getPosition :: [a] -> StdGen -> (Int, StdGen)
+getPosition xs g = randomR (bounds xs) g
+
+extractInCouple :: [a] -> (Int, StdGen) -> (a, StdGen)
+extractInCouple xs (i, g) = (xs !! i, g)
 --
 -- Gaussian distribution
 --
 boxMuller :: StdGen -> (Float, StdGen)
-boxMuller gen = (sqrt (-2 * log u1) * cos (2 * pi * u2), gen'')
-    where (u1, gen')  = randomR (0, 1) gen 
-          (u2, gen'') = randomR (0, 1) gen'
-
---
--- Helper function that wraps boxMuller
---
-generateGaussIO :: IO Float
-generateGaussIO = do
-    gen <- newStdGen
-    return (fst $ boxMuller gen)
+boxMuller seed = (sqrt (-2 * log u1) * cos (2 * pi * u2), seed_2)
+    where (u1, seed_1)  = randomR (0, 1) seed 
+          (u2, seed_2) = randomR (0, 1) seed_1
 
 --
 -- Check if in bounds
@@ -98,28 +96,39 @@ instance GeneFormat CoupleGene where
         putStrLn ("Gene: (" ++ (printf "%12.8f" g1) ++ ", " ++ (printf "%12.8f" g2) ++"); Fitness: " ++ (printf "%14.8f" f))
 
 --
--- Generic id function
---
-idIO :: a -> IO a
-idIO g = do
-    return g
-
---
 -- Type class with instances that generate the starting population
 -- 
-class StartPopulationIO g where
-    startPopulationIO :: Int -> Float -> Float -> IO [g]
+class StartPopulation g where
+    startPopulation :: Int -> Float -> Float -> State StdGen [g]
 
-instance StartPopulationIO BaseGene where
-    startPopulationIO n lb ub = do
-        seed <- newStdGen
-        return $ take n (map BaseGene (randomRs (lb, ub) seed))
+instance StartPopulation BaseGene where
+    -- startPopulation n lb ub seed = take n $ map BaseGene (randomRs (lb, ub) seed)
+    startPopulation n lb ub = do
+        replicateM n $ fmap BaseGene $ state $ randomR (lb, ub)
 
-instance StartPopulationIO CoupleGene where
-    startPopulationIO n lb ub = do
-        seed_1 <- newStdGen
-        seed_2 <- newStdGen
-        return $ take n (map CoupleGene (zip (randomRs (lb, ub) seed_1) (randomRs (lb, ub) seed_2)))
+instance StartPopulation CoupleGene where
+    -- startPopulation n lb ub seed_1 = take n $ map CoupleGene $ zip (randomRs (lb, ub) seed_1) (randomRs (lb, ub) seed_2)
+    --    where (_, seed_2) = random seed_1 :: (Float, StdGen)
+    startPopulation n lb ub = do
+        replicateM n $ fmap CoupleGene $ state $ randomR' (lb, ub)
+
+-- These functions helped me to sort out wrapping/unwrapping in the State Monad
+-- randomR'' :: (Float, Float) -> State StdGen BaseGene
+-- randomR'' (lb, ub) = fmap BaseGene (state (randomR (lb, ub)))
+
+-- randoms' :: Int -> Float -> Float -> State StdGen [BaseGene]
+-- randoms' n lb ub = replicateM n (randomR'' (lb, ub))
+
+-- randoms :: Int -> Float -> Float -> StdGen -> ([BaseGene], StdGen)
+-- randoms n lb ub = runState (randoms' n lb ub)
+
+-- randomState :: Float -> Float -> State StdGen CoupleGene
+-- randomState lb ub = fmap CoupleGene (state (randomR' (lb, ub)))
+
+-- This is actually used in startPopulation
+randomR' :: (Float, Float) -> StdGen -> ((Float, Float), StdGen)
+randomR' (lb, ub) seed = ((fst (randomR (lb, ub) seed), fst (randomR (lb, ub) seed_1)), seed_2)
+    where (seed_1, seed_2) = split seed
 
 --
 -- Generic function to calculate the fitness
@@ -131,66 +140,78 @@ calcFitness xs = map fitnessFunction xs
 --
 -- Mutation using delta mutation
 --
-class MutateStandardIO g where
-    mutateStandardIO :: g -> IO g
+class MutateStandard g where
+    mutateStandard :: g -> State StdGen g
 
-instance MutateStandardIO BaseGene where
-    mutateStandardIO (BaseGene g) = do
-        factor <- pick [-1.0, 1.0]
+instance MutateStandard BaseGene where
 -- making an identical copy of the parent, and then probabilistically mutating it to produce the offspring.
-        return $ BaseGene (g + factor)
+    mutateStandard (BaseGene g) = do
+        seed <- get
+        let (factor, newseed) = pick [-1.0, 1.0] seed
+        put newseed
+        return (BaseGene (g + factor))
 
-instance MutateStandardIO CoupleGene where
-    mutateStandardIO (CoupleGene (f, s)) = do
-        factor <- pick [-1.0, 1.0]
+instance MutateStandard CoupleGene where
 -- making an identical copy of the parent, and then probabilistically mutating it to produce the offspring.
-        return $ CoupleGene (f + factor, s + factor)
+    mutateStandard (CoupleGene (f, s)) = do
+        seed <- get
+        let (factor_1, newseed) = pick [-1.0, 1.0] seed
+        let (factor_2, finalseed) = pick [-1.0, 1.0] newseed
+        put finalseed
+        return (CoupleGene (f + factor_1, s + factor_2))
 
 --
 -- Type class with instances that probabilistically mutate a gene
 -- using a gaussian distribution
 --
-class MutateGaussIO g where
-    mutateGaussIO :: g -> IO g
+class MutateGauss g where
+    mutateGauss :: g -> State StdGen g
 
-instance MutateGaussIO BaseGene where
-    mutateGaussIO (BaseGene g) = do
-        factor <- generateGaussIO
+instance MutateGauss BaseGene where
 -- making an identical copy of the parent, and then probabilistically mutating it to produce the offspring.
-        return $ BaseGene (g + factor)
+    mutateGauss (BaseGene g) = do
+        seed <- get
+        let (factor, newseed) = boxMuller seed
+        put newseed
+        return (BaseGene (g + factor))
 
-instance MutateGaussIO CoupleGene where
-    mutateGaussIO (CoupleGene (f, s)) = do
-        delta_1 <- generateGaussIO
-        delta_2 <- generateGaussIO
+instance MutateGauss CoupleGene where
 -- making an identical copy of the parent, and then probabilistically mutating it to produce the offspring.
-        return $ CoupleGene (f + delta_1, s + delta_2)
-
+    mutateGauss (CoupleGene (f, s)) = do
+        seed <- get
+        let (factor_1, newseed) = boxMuller seed
+        let (factor_2, finalseed) = boxMuller newseed
+        put finalseed
+        return (CoupleGene (f + factor_1, s + factor_2))
 --
 -- Generic function to extract a gene and mutate it using 
--- a function with signature g -> IO g
+-- a function with signature g -> g
 --
-extractElementAndMutateIO :: [g] -> Int -> (g -> IO g) -> IO g
-extractElementAndMutateIO pop pos f = do
-    let elem = (pop !! pos)
-    offspring <- f elem
+extractElementAndMutate :: [g] -> Int -> (g -> State StdGen g) -> State StdGen g
+extractElementAndMutate pop pos f = do
+    seed <- get
+    let elem = pop !! pos
+    let (offspring, newseed) = runState (f elem) seed
+    put newseed
     return offspring
 
 --
 -- Generic function that takes a population and a mutation function
 -- and returns a new population with the mutation in place if it has higher fitness
 --
-evolveIO :: (InBounds g, FitnessFunction g) => [g] -> (g -> IO g) -> Float -> Float -> IO [g]
-evolveIO pop f lb ub = do
-    pos_1 <- randomRIO (0, length pop - 1)
-    pos_2 <- randomRIO (0, length pop - 1)
+evolve :: (InBounds g, FitnessFunction g) => Float -> Float -> [g] -> (g -> State StdGen g) -> State StdGen [g]
+evolve lb ub pop f = do
+    seed <- get
+    let (pos_1, seed_1) = randomR (bounds pop) seed
+    let (pos_2, seed_2) = randomR (bounds pop) seed_1
 -- select a parent randomly using a uniform probability distribution over the current population.
 -- Use the selected parent to produce a single offspring
-    offspring <- extractElementAndMutateIO pop pos_1 f
-    opponent <- extractElementAndMutateIO pop pos_2 idIO
+    let (offspring, finalseed) = runState (extractElementAndMutate pop pos_1 f) seed_2
+    let opponent = pop !! pos_2
     let offFitness = fitnessFunction offspring
     let oppFitness = fitnessFunction opponent
     let winner = if offFitness > oppFitness then offspring else opponent
+    put finalseed
     if inBounds offspring lb ub
 -- randomly selecting a candidate for deletion from the current population using a uniform probability distribution;
 -- and keeping either the candidate or the offspring depending on wich one has higher fitness.
@@ -201,17 +222,17 @@ evolveIO pop f lb ub = do
 -- Core generic function that generates n generations starting fom
 -- the initial population using a probabilistic mutation function
 -- [g] starting population
--- (g -> IO g) mutation function
+-- (g -> State StdGen g) mutation function
 -- [[g]] accumulator
 -- n number of steps remaining
 -- IO [[g]] full history
 --
-generateIO :: (InBounds g, FitnessFunction g) => [g] -> (g -> IO g) -> [[g]] -> Int -> Float -> Float -> IO [[g]]
-generateIO xs f acc n lb ub =
+generate :: (InBounds g, FitnessFunction g) => Float -> Float -> [g] -> [[g]] -> Int -> (g -> State StdGen g) -> State StdGen [[g]]
+generate lb ub xs acc n f =
     if n == 0
         then do
-            ys <- evolveIO xs f lb ub
+            ys <- evolve lb ub xs f
             return ([ys]++[xs]++acc)  
         else do
-            ys <- evolveIO xs f lb ub
-            generateIO ys f ([xs]++acc) (n-1) lb ub
+            ys <- evolve lb ub xs f
+            generate lb ub ys ([xs]++acc) (n-1) f

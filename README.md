@@ -31,5 +31,5 @@ I choose this example in order to learn some "real world" Haskell (and I found i
 
 ```
 $ stack build
-$ stack exec dejong-exe
+$ stack exec dejong
 ```
